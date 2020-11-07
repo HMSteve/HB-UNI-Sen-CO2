@@ -41,7 +41,6 @@
 
 
 #define PEERS_PER_CHANNEL 6
-#define SAMPLINGINTERVALL_IN_SECONDS 180  
 //#define BATT_SENSOR tmBatteryResDiv<A0, A1, 5700>  //SG: taken from Tom's Unisensor01
 // tmBatteryLoad: sense pin A0, activation pin D9, Faktor = Rges/Rlow*1000, z.B. 10/30 Ohm, Faktor 40/10*1000 = 4000, 200ms Belastung vor Messung
 // 1248p has 2.56V ARef, 328p has 1.1V ARef
@@ -171,7 +170,7 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     }
 
     uint32_t delay () {
-      return seconds2ticks(max(this->device().getList0().updIntervall(),SAMPLINGINTERVALL_IN_SECONDS));
+      return seconds2ticks(this->device().getList0().updIntervall());
     }
     void setup(Device<Hal, SensorList0>* dev, uint8_t number, uint16_t addr) {
       Channel::setup(dev, number, addr);
@@ -188,11 +187,13 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     }
 };
 
-class IAQDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> {
+class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> {
   public:
     typedef MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> TSDevice;
-    IAQDevice(const DeviceInfo& info, uint16_t addr) : TSDevice(info, addr) {}
-    virtual ~IAQDevice () {}
+    SensChannelDevice(const DeviceInfo& info, uint16_t addr) : TSDevice(info, addr) 
+    {
+    }
+    virtual ~SensChannelDevice () {}
 
     virtual void configChanged () {
       TSDevice::configChanged();
@@ -201,8 +202,8 @@ class IAQDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0>
     }
 };
 
-IAQDevice sdev(devinfo, 0x20);
-ConfigButton<IAQDevice> cfgBtn(sdev);
+SensChannelDevice sdev(devinfo, 0x20);
+ConfigButton<SensChannelDevice> cfgBtn(sdev);
 
 void setup () {
   //SG: switch on MOSFET to power CC1101

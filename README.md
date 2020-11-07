@@ -1,15 +1,14 @@
-# Universalsensor (TVOC, Luftqualitaet, Temperatur und Luftfeuchte)
+# Universalsensor (CO2, Temperatur und Luftfeuchte)
 
-Eine AskSinPP-Implementierung eines Innenraum-Sensos mit dem IAQ-Sensor SGPC3 sowie dem Temperatur- und Feuchtesensor SHT31. Als Hardwarebasis dient z.B. meine ATMega1284P-Universalsensorplatine:
+Eine AskSinPP-Implementierung eines Innenraum-Sensos mit dem NDIR-CO2-Sensor SCD30 . Als Hardwarebasis dient z.B. meine ATMega1284P-Universalsensorplatine:
 
 [AskSinPP 1284 Board](https://github.com/HMSteve/PCBs/tree/master/AskSinPP_1284_Board)
 
-Da SGPC3 Breakout Boards im Standardformat mit I2C-Schnittstelle nicht am Markt zu finden waren, habe ich ein eigenes erstellt: [SGPC3 Breakout Board](https://github.com/HMSteve/PCBs/tree/master/SGPC3_BreakoutBoard). Grundsaetzlich kann auch der leichter verfuegbare SGP30 genutzt werden, wenn der Sketch entsprechend angepasst wird, jedoch ist dieser bzgl. des Stromverbrauchs nicht fuer den Batteriebetrieb optimiert.
 
 
 ## Software
 
-Sofern noch nicht vorhanden oder nicht aktuell, ist das [Addon](https://github.com/HMSteve/SG-HB-Devices-Addon/raw/master/CCU_RM/sg-hb-devices-addon.tgz) auf der CCU zu installieren. Der Sensor benoetigt mindestens Version 1.10.
+Sofern noch nicht vorhanden oder nicht aktuell, ist das [Addon](https://github.com/HMSteve/SG-HB-Devices-Addon/raw/master/CCU_RM/sg-hb-devices-addon.tgz) auf der CCU zu installieren. Der Sensor benoetigt mindestens Version 1.20.
 
 Die AskSinPP-Platine wird wie ueblich geflasht und kann dann angelernt werden.
 
