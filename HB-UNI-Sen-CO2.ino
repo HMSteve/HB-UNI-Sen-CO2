@@ -8,19 +8,26 @@
 
 //#define NDEBUG   // disable all serial debug messages  //necessary to fit 328p!!!
 // #define USE_CC1101_ALT_FREQ_86835  //use alternative frequency to compensate not correct working cc1101 modules
-#define SENSOR_ONLY
+//#define SENSOR_ONLY
 
 #define EI_NOTEXTERNAL
 #define M1284P // select pin config for ATMega1284p board
+#define useBMP280 //use pressure sensor fort compensation
+
+#define SCD30_MEASUREMENT_INTERVAL 8
+#define BAT_VOLT_LOW        18  // 1.8V
+#define BAT_VOLT_CRITICAL   16  // 1.6V
 
 #include <EnableInterrupt.h>
 #include <AskSinPP.h>
 #include <LowPower.h>
 #include <Register.h>
-
 #include <MultiChannelDevice.h>
 #include "sensors/Sens_SCD30.h"
 #include "sensors/tmBattery.h"  //SG: added from Tom's UniSensor project
+#if defined useBMP280
+  #include "sensors/Sens_BMP280.h"
+#endif
 
 #if defined M1284P
  // Stephans AskSinPP 1284 Board v1.1
@@ -90,8 +97,8 @@ class Hal : public BaseHal {
 #endif
       // measure battery every a*b*c seconds
       battery.init(seconds2ticks(60UL * 60 * 6), sysclock);  // 60UL * 60 for 1hour
-      battery.low(18);
-      battery.critical(16);
+      battery.low(BAT_VOLT_LOW);
+      battery.critical(BAT_VOLT_CRITICAL);
     }
 
     bool runready () {
@@ -99,7 +106,7 @@ class Hal : public BaseHal {
     }
 } hal;
 
-DEFREGISTER(Reg0, MASTERID_REGS, 0x20, 0x21)
+DEFREGISTER(Reg0, MASTERID_REGS, DREG_LEDMODE, DREG_LOWBATLIMIT, DREG_TRANSMITTRYMAX, 0x20, 0x21, 0x22, 0x23, 0x24)
 class SensorList0 : public RegList0<Reg0> {
   public:
     SensorList0(uint16_t addr) : RegList0<Reg0>(addr) {}
@@ -110,18 +117,37 @@ class SensorList0 : public RegList0<Reg0> {
     uint16_t updIntervall () const {
       return (this->readRegister(0x20, 0) << 8) + this->readRegister(0x21, 0);
     }
+    
+    bool altitude (uint16_t value) const {
+      return this->writeRegister(0x22, (value >> 8) & 0xff) && this->writeRegister(0x23, value & 0xff);
+    }
+    uint16_t altitude () const {
+      return (this->readRegister(0x22, 0) << 8) + this->readRegister(0x23, 0);
+    }
+
+    bool tempOffset10 (uint8_t value) const {
+      return this->writeRegister(0x24, value & 0xff);
+    }
+    uint16_t tempOffset10 () const {
+      return this->readRegister(0x24, 0);
+    }    
 
 
     void defaults () {
       clear();
-      updIntervall(11);
+      ledMode(1);
+      lowBatLimit(BAT_VOLT_LOW);
+      transmitDevTryMax(6);     
+      updIntervall(11); //seconds
+      altitude(62); //meters
+      tempOffset10(8); //temperature offset for SCD30 calib: 15 means 1.5K
     }
 };
 
 
 class WeatherEventMsg : public Message {
   public:
-    void init(uint8_t msgcnt, int16_t temp, uint8_t humidity, uint16_t co2, uint8_t volt, bool batlow) {
+    void init(uint8_t msgcnt, int16_t temp, uint8_t humidity, uint16_t pressureNN, uint16_t co2, uint8_t volt, bool batlow) {
       uint8_t t1 = (temp >> 8) & 0x7f;
       uint8_t t2 = temp & 0xff;
       if ( batlow == true ) {
@@ -133,18 +159,25 @@ class WeatherEventMsg : public Message {
           flags = BIDI | WKMEUP;
       }      
       // Message Length (first byte param.): 11 + payload. Max. payload: 17 Bytes (https://www.youtube.com/watch?v=uAyzimU60jw)
-      Message::init(15, msgcnt, 0x70, flags, t1, t2);
+      Message::init(17, msgcnt, 0x70, flags, t1, t2);
       pload[0] = humidity & 0xff;
-      pload[1] = (co2 >> 8) & 0xff;           
-      pload[2] = co2 & 0xff;         
-      pload[3] = volt & 0xff;
+      pload[1] = (pressureNN >> 8) & 0xff;           
+      pload[2] = pressureNN & 0xff;          
+      pload[3] = (co2 >> 8) & 0xff;           
+      pload[4] = co2 & 0xff;         
+      pload[5] = volt & 0xff;
     }
 };
 
 class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
     WeatherEventMsg msg;
     Sens_SCD30    scd30;
+    #if defined useBMP280
+      Sens_BMP280 bmp280;
+    #endif   
     uint16_t      millis;
+    uint16_t      pressureAmb = 1013; //mean pressure at sea level in hPa
+    uint16_t      pressureNN = 0; //dummy value to be returned if no sensor measurement
 
   public:
     WeatherChannel () : Channel(), Alarm(10), millis(0) {}
@@ -155,11 +188,20 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       // reactivate for next measure
       tick = delay();
       clock.add(*this);
-      scd30.measure();
-      DPRINT("temp / hum = ");DDEC(scd30.temperature());DPRINT(" / ");DDECLN(scd30.humidity());
-      DPRINT("CO2 = ");DDECLN(scd30.carbondioxide());
-      DPRINT("Batterie = ");DDECLN(device().battery().current() / 100);
-      msg.init( msgcnt, scd30.temperature(), scd30.humidity(), scd30.carbondioxide(), device().battery().current() / 100, device().battery().low());
+      #if defined useBMP280
+        bmp280.measure(this->device().getList0().altitude());
+        pressureAmb = bmp280.pressureAmb()/10;
+        pressureNN = bmp280.pressureNN();
+      #endif
+      scd30.measure(pressureAmb);
+      DPRINT("Temp x10 / Hum / PressureNN x10 / PressureAmb / Batt x10 / CO2 = ");
+      DDEC(scd30.temperature());DPRINT(" / ");
+      DDEC(scd30.humidity());DPRINT(" / ");
+      DDEC(pressureNN);DPRINT(" / ");
+      DDEC(pressureAmb);DPRINT(" / ");     
+      DDEC(device().battery().current() / 100);DPRINT(" / ");
+      DDECLN(scd30.carbondioxide());
+      msg.init( msgcnt, scd30.temperature(), scd30.humidity(), pressureNN, scd30.carbondioxide(), device().battery().current() / 100, device().battery().low());
       if (msg.flags() & Message::BCAST) {
         device().broadcastEvent(msg, *this);
       }
@@ -174,7 +216,10 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     }
     void setup(Device<Hal, SensorList0>* dev, uint8_t number, uint16_t addr) {
       Channel::setup(dev, number, addr);
-      scd30.init(0,1030,0,8);
+      scd30.init(this->device().getList0().altitude(), device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL);
+      #if defined useBMP280
+        bmp280.init();
+      #endif     
       sysclock.add(*this);
     }
 
@@ -198,7 +243,12 @@ class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, Sens
     virtual void configChanged () {
       TSDevice::configChanged();
       DPRINTLN("* Config Changed       : List0");
+      DPRINT(F("* LED Mode             : ")); DDECLN(this->getList0().ledMode());    
+      DPRINT(F("* Low Bat Limit        : ")); DDECLN(this->getList0().lowBatLimit()); 
+      DPRINT(F("* Sendeversuche        : ")); DDECLN(this->getList0().transmitDevTryMax());                   
       DPRINT(F("* SENDEINTERVALL       : ")); DDECLN(this->getList0().updIntervall());
+      DPRINT(F("* Hoehe ueber NN       : ")); DDECLN(this->getList0().altitude());
+      DPRINT(F("* Temp Offset x10      : ")); DDECLN(this->getList0().tempOffset10());      
     }
 };
 
@@ -215,13 +265,18 @@ void setup () {
   sdev.init(hal);
   buttonISR(cfgBtn, CONFIG_BUTTON_PIN);
   sdev.initDone();
-
+  DPRINT("List0 dump: "); sdev.getList0().dump();
 }
 
 void loop() {
   bool worked = hal.runready();
   bool poll = sdev.pollRadio();
   if ( worked == false && poll == false ) {
+    if (hal.battery.critical()) {
+      // this call will never return
+      hal.activity.sleepForever(hal);
+    }    
+    // if nothing to do - go to sleep
     hal.activity.savePower<Sleep<>>(hal);
   }
 }

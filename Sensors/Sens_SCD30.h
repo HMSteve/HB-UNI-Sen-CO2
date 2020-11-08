@@ -56,7 +56,7 @@ public:
     {
     }
 
-    void init(uint16_t height, uint16_t ambient_pressure, uint16_t temperature_correction, uint16_t update_intervall)
+    void init(uint16_t height, /*uint16_t ambient_pressure,*/ uint16_t temperature_correction, uint16_t update_intervall)
     {
         Wire.begin();
 
@@ -79,7 +79,7 @@ public:
 
           _scd30.setAltitudeCompensation(height);              // Set altitude of the sensor in m
 
-          _scd30.setAmbientPressure(ambient_pressure);         // Current ambient pressure in mBar: 700 to 1200
+          // _scd30.setAmbientPressure(ambient_pressure);         // Current ambient pressure in mBar: 700 to 1200
 
           _scd30.setAutoSelfCalibration(true);                 // enable autocalibration
 
@@ -101,18 +101,24 @@ public:
         DPRINTLN("Stop continuous measurements of SCD30");
     }
 
-    void measure()
+    void measure(uint16_t pressureAmb)
     {
         _temperature = _carbondioxide = _humidity = 0;
         if (_present == true) {
+            _scd30.setAmbientPressure(pressureAmb);
             measureRaw();
-            DPRINT(F("SCD30 Temperature x10  : "));
-            DDECLN(_temperature);
-            DPRINT(F("SCD30 Carbondioxide    : "));
-            DDECLN(_carbondioxide);
-            DPRINT(F("SCD30 Humidity         : "));
-            DDECLN(_humidity);
+            //DPRINT(F("SCD30 Temperature x10  : "));
+            //DDECLN(_temperature);
+            //DPRINT(F("SCD30 Carbondioxide    : "));
+            //DDECLN(_carbondioxide);
+            //DPRINT(F("SCD30 Humidity         : "));
+            //DDECLN(_humidity);
         }
+    }
+
+    void measure()
+    {
+      measure(1013); //overload: if no ambient pressure passed, use mean pressure at sea level
     }
 
     int16_t  temperature() { return _temperature; }
