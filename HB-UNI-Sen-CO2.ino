@@ -15,8 +15,9 @@
 #define useBMP280 //use pressure sensor fort compensation
 
 #define SCD30_MEASUREMENT_INTERVAL 8
-#define BAT_VOLT_LOW        18  // 1.8V
-#define BAT_VOLT_CRITICAL   16  // 1.6V
+#define SCD30_REFERENCE_CO2 410 // 410ppm used for forced calib in fresh air 
+#define BAT_VOLT_LOW        19  // 1.9V
+#define BAT_VOLT_CRITICAL   17  // 1.7V
 
 #include <EnableInterrupt.h>
 #include <AskSinPP.h>
@@ -29,6 +30,7 @@
   #include "sensors/Sens_BMP280.h"
 #endif
 
+
 #if defined M1284P
  // Stephans AskSinPP 1284 Board v1.1
  #define CC1101_CS_PIN       4
@@ -37,9 +39,10 @@
  #define CC1101_MOSI_PIN     5 
  #define CC1101_MISO_PIN     6 
  #define LED_PIN 14             //LEDs on PD6 (Arduino Pin 14) and PD7 (Arduino Pin 15) 
- #define LED_PIN2 15
+ #define LED2_PIN 15
  #define CONFIG_BUTTON_PIN 13
  #define CC1101_PWR_SW_PIN 27
+ #define CALIB_BUTTON_PIN  11  //actually meant as 1Wire Pin, reused for button
 #else
   // Stephans AskSinPP Universal Board v1.0
   #define LED_PIN 6
@@ -83,6 +86,7 @@ const struct DeviceInfo PROGMEM devinfo = {
 #endif
 
 typedef StatusLed<LED_PIN> LedType;
+typedef StatusLed<LED2_PIN> Led2Type;
 //typedef AskSin<LedType, BatterySensor, RadioType> BaseHal;
 typedef AskSin<LedType, BATT_SENSOR, RadioType> BaseHal;
 class Hal : public BaseHal {
@@ -105,6 +109,7 @@ class Hal : public BaseHal {
       return sysclock.runready() || BaseHal::runready();
     }
 } hal;
+
 
 DEFREGISTER(Reg0, MASTERID_REGS, DREG_LEDMODE, DREG_LOWBATLIMIT, DREG_TRANSMITTRYMAX, 0x20, 0x21, 0x22, 0x23, 0x24)
 class SensorList0 : public RegList0<Reg0> {
@@ -137,10 +142,10 @@ class SensorList0 : public RegList0<Reg0> {
       clear();
       ledMode(1);
       lowBatLimit(BAT_VOLT_LOW);
-      transmitDevTryMax(6);     
+      transmitDevTryMax(3);     
       updIntervall(11); //seconds
       altitude(62); //meters
-      tempOffset10(8); //temperature offset for SCD30 calib: 15 means 1.5K
+      tempOffset10(0); //temperature offset for SCD30 calib: 15 means 1.5K
     }
 };
 
@@ -169,15 +174,16 @@ class WeatherEventMsg : public Message {
     }
 };
 
+
 class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
-    WeatherEventMsg msg;
-    Sens_SCD30    scd30;
-    #if defined useBMP280
-      Sens_BMP280 bmp280;
-    #endif   
-    uint16_t      millis;
-    uint16_t      pressureAmb = 1013; //mean pressure at sea level in hPa
-    uint16_t      pressureNN = 0; //dummy value to be returned if no sensor measurement
+    WeatherEventMsg     msg;
+    uint16_t            millis;
+    uint16_t            pressureAmb = 1013; //mean pressure at sea level in hPa
+    uint16_t            pressureNN = 0; //dummy value to be returned if no sensor measurement
+#if defined useBMP280
+    Sens_BMP280       bmp280;
+#endif       
+    public : Sens_SCD30 scd30;  // needs to be public for forced calib and stop measurement by external triggers
 
   public:
     WeatherChannel () : Channel(), Alarm(10), millis(0) {}
@@ -216,7 +222,7 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     }
     void setup(Device<Hal, SensorList0>* dev, uint8_t number, uint16_t addr) {
       Channel::setup(dev, number, addr);
-      scd30.init(this->device().getList0().altitude(), device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL);
+      scd30.init(this->device().getList0().altitude(), device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL, false);
       #if defined useBMP280
         bmp280.init();
       #endif     
@@ -232,12 +238,14 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     }
 };
 
+
 class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> {
   public:
     typedef MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> TSDevice;
     SensChannelDevice(const DeviceInfo& info, uint16_t addr) : TSDevice(info, addr) 
     {
     }
+    
     virtual ~SensChannelDevice () {}
 
     virtual void configChanged () {
@@ -252,21 +260,56 @@ class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, Sens
     }
 };
 
+
+
+class CalibButton : public Button {
+  SensChannelDevice& device;
+  Led2Type led;
+
+public:
+  CalibButton (SensChannelDevice& dev, uint8_t longpresstime=3) : device(dev) {
+    this->setLongPressTime(seconds2ticks(longpresstime));
+    led.init();
+  }
+ 
+  virtual ~CalibButton () {}
+ 
+  virtual void state (uint8_t s) {
+    uint8_t old = Button::state();
+    Button::state(s);
+    if( s == Button::released ) {
+      DPRINTLN("Calib Btn released");
+      bool fc = device.channel(0).scd30.setForcedRecalibrationFactor(SCD30_REFERENCE_CO2);
+      if (fc==true) {
+        led.set(LedStates::send);
+      }
+      else {
+        led.set(LedStates::failure);
+      }
+    }
+  }
+};
+
+
+
 SensChannelDevice sdev(devinfo, 0x20);
 ConfigButton<SensChannelDevice> cfgBtn(sdev);
+CalibButton calibBtn(sdev);
+
+
 
 void setup () {
   //SG: switch on MOSFET to power CC1101
   pinMode(CC1101_PWR_SW_PIN, OUTPUT);
   digitalWrite (CC1101_PWR_SW_PIN, LOW);
-
-  
   DINIT(57600, ASKSIN_PLUS_PLUS_IDENTIFIER);
   sdev.init(hal);
   buttonISR(cfgBtn, CONFIG_BUTTON_PIN);
+  buttonISR(calibBtn, CALIB_BUTTON_PIN);  
   sdev.initDone();
-  DPRINT("List0 dump: "); sdev.getList0().dump();
+  //DPRINT("List0 dump: "); sdev.getList0().dump();
 }
+
 
 void loop() {
   bool worked = hal.runready();
@@ -274,7 +317,8 @@ void loop() {
   if ( worked == false && poll == false ) {
     if (hal.battery.critical()) {
       // this call will never return
-      hal.activity.sleepForever(hal);
+      sdev.channel(0).scd30.stop_measurements();     
+      hal.activity.sleepForever(hal);      
     }    
     // if nothing to do - go to sleep
     hal.activity.savePower<Sleep<>>(hal);

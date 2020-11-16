@@ -32,7 +32,7 @@ class Sens_SCD30 : public Sensor {
         DPRINTLN("");
         while (!_scd30.dataAvailable())
         {
-            delay(1000);
+            delay(200);
             DPRINT(".");
             if (_scd30.dataAvailable())
             {
@@ -41,7 +41,7 @@ class Sens_SCD30 : public Sensor {
         }
         if (_scd30.dataAvailable())
         {
-              _temperature      = (int16_t)(_scd30.getTemperature() * 10);
+              _temperature      = (int16_t)(_scd30.getTemperature() * 10.0);
               _carbondioxide    = (uint16_t)(_scd30.getCO2());
               _humidity         = (uint8_t)(_scd30.getHumidity());
               DPRINTLN("");
@@ -56,7 +56,8 @@ public:
     {
     }
 
-    void init(uint16_t height, /*uint16_t ambient_pressure,*/ uint16_t temperature_correction, uint16_t update_intervall)
+
+    void init(uint16_t altitude, uint16_t temperature_correction, uint16_t measurement_interval, bool auto_self_calib)
     {
         Wire.begin();
 
@@ -72,28 +73,25 @@ public:
         {
           DPRINTLN(F("SCD30 found"));
           _present = true;
-
-          _scd30.setMeasurementInterval(update_intervall/4);   // Change number of seconds between measurements: 2 to 1800 (30 minutes)
-                                                                  // update_intervall = 240 sec; SCD30 measurement intervall: 60 sec to allow SCD30 internal
-                                                                  // hardware oversampling
-
-          _scd30.setAltitudeCompensation(height);              // Set altitude of the sensor in m
-
-          // _scd30.setAmbientPressure(ambient_pressure);         // Current ambient pressure in mBar: 700 to 1200
-
-          _scd30.setAutoSelfCalibration(true);                 // enable autocalibration
-
-          float offset = _scd30.getTemperatureOffset();
-          DPRINT("Current temp offset: ");
-          DPRINT(offset);
-          DPRINTLN(" deg C");
-
-          _scd30.setTemperatureOffset((float)temperature_correction/10.0); //Optionally we can set temperature offset to 5°C
-          DPRINT("New temp offset: ");
-          DPRINT((float)temperature_correction/10.0);
-          DPRINTLN(" deg C");
+          _scd30.setMeasurementInterval(measurement_interval);               // Change number of seconds between measurements: 2 to 1800 (30 minutes)
+          _scd30.setAltitudeCompensation(altitude);                          // Set altitude of the sensor in m
+          _scd30.setAutoSelfCalibration(auto_self_calib);                    // enable/disable auto self calibration, sensor needs to see fresh air regularly!
+          _scd30.setTemperatureOffset((float)temperature_correction/10.0);   //temp offset between on-board sensor and ambient temp
         }
     }
+
+
+    bool setForcedRecalibrationFactor(uint16_t concentration)
+    {
+      return(_scd30.setForcedRecalibrationFactor(concentration));
+    }
+
+
+    float getTemperatureOffset(void)
+    {
+      return _scd30.getTemperatureOffset();
+    }
+
 
     void stop_measurements()
     {
@@ -101,20 +99,16 @@ public:
         DPRINTLN("Stop continuous measurements of SCD30");
     }
 
+
     void measure(uint16_t pressureAmb)
     {
         _temperature = _carbondioxide = _humidity = 0;
         if (_present == true) {
             _scd30.setAmbientPressure(pressureAmb);
             measureRaw();
-            //DPRINT(F("SCD30 Temperature x10  : "));
-            //DDECLN(_temperature);
-            //DPRINT(F("SCD30 Carbondioxide    : "));
-            //DDECLN(_carbondioxide);
-            //DPRINT(F("SCD30 Humidity         : "));
-            //DDECLN(_humidity);
         }
     }
+
 
     void measure()
     {
