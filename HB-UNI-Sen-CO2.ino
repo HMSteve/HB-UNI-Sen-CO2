@@ -16,8 +16,8 @@
 
 #define SCD30_MEASUREMENT_INTERVAL 8
 #define SCD30_REFERENCE_CO2 410 // 410ppm used for forced calib in fresh air 
-#define BAT_VOLT_LOW        19  // 1.9V
-#define BAT_VOLT_CRITICAL   17  // 1.7V
+#define BAT_VOLT_LOW        24  // 2.4V for 2x Eneloop 
+#define BAT_VOLT_CRITICAL   23  // 2.3V for 2x Eneloop
 
 #include <EnableInterrupt.h>
 #include <AskSinPP.h>
@@ -152,7 +152,7 @@ class SensorList0 : public RegList0<Reg0> {
 
 class WeatherEventMsg : public Message {
   public:
-    void init(uint8_t msgcnt, int16_t temp, uint8_t humidity, uint16_t pressureNN, uint16_t co2, uint8_t volt, bool batlow) {
+    void init(uint8_t msgcnt, int16_t temp, uint8_t humidity, uint16_t pressureNN, uint16_t co2, uint16_t volt, bool batlow) {
       uint8_t t1 = (temp >> 8) & 0x7f;
       uint8_t t2 = temp & 0xff;
       if ( batlow == true ) {
@@ -164,13 +164,14 @@ class WeatherEventMsg : public Message {
           flags = BIDI | WKMEUP;
       }      
       // Message Length (first byte param.): 11 + payload. Max. payload: 17 Bytes (https://www.youtube.com/watch?v=uAyzimU60jw)
-      Message::init(17, msgcnt, 0x70, flags, t1, t2);
+      Message::init(18, msgcnt, 0x70, flags, t1, t2);
       pload[0] = humidity & 0xff;
       pload[1] = (pressureNN >> 8) & 0xff;           
       pload[2] = pressureNN & 0xff;          
       pload[3] = (co2 >> 8) & 0xff;           
       pload[4] = co2 & 0xff;         
-      pload[5] = volt & 0xff;
+      pload[5] = (volt >>8) & 0xff;
+      pload[6] = volt & 0xff;      
     }
 };
 
@@ -205,9 +206,9 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       DDEC(scd30.humidity());DPRINT(" / ");
       DDEC(pressureNN);DPRINT(" / ");
       DDEC(pressureAmb);DPRINT(" / ");     
-      DDEC(device().battery().current() / 100);DPRINT(" / ");
+      DDEC(device().battery().current() / 10);DPRINT(" / ");
       DDECLN(scd30.carbondioxide());
-      msg.init( msgcnt, scd30.temperature(), scd30.humidity(), pressureNN, scd30.carbondioxide(), device().battery().current() / 100, device().battery().low());
+      msg.init( msgcnt, scd30.temperature(), scd30.humidity(), pressureNN, scd30.carbondioxide(), device().battery().current() / 10, device().battery().low());
       if (msg.flags() & Message::BCAST) {
         device().broadcastEvent(msg, *this);
       }
@@ -317,7 +318,9 @@ void loop() {
   if ( worked == false && poll == false ) {
     if (hal.battery.critical()) {
       // this call will never return
-      sdev.channel(0).scd30.stop_measurements();     
+      DPRINTLN("!!!Shutting down due to critical battery voltage!!!");
+      sdev.channel(0).scd30.stop_measurements();          
+      delay(100);
       hal.activity.sleepForever(hal);      
     }    
     // if nothing to do - go to sleep
