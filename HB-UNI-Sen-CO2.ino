@@ -16,8 +16,8 @@
 
 #define SCD30_MEASUREMENT_INTERVAL 8
 #define SCD30_REFERENCE_CO2 410 // 410ppm used for forced calib in fresh air 
-#define BAT_VOLT_LOW        24  // 2.4V for 2x Eneloop 
-#define BAT_VOLT_CRITICAL   23  // 2.3V for 2x Eneloop
+#define BAT_VOLT_LOW        22  // 2.2V for 2x Eneloop 
+#define BAT_VOLT_CRITICAL   20  // 2.0V for 2x Eneloop
 
 #include <EnableInterrupt.h>
 #include <AskSinPP.h>
@@ -30,9 +30,29 @@
   #include "sensors/Sens_BMP280.h"
 #endif
 
+// EPaper setup
+#include <GxEPD.h>
+#include <GxGDEH0154D67/GxGDEH0154D67.h>
 
-#if defined M1284P
- // Stephans AskSinPP 1284 Board v1.1
+#include <GxIO/GxIO_SPI/GxIO_SPI.h>
+#include <GxIO/GxIO.h>
+
+#include <Fonts/FreeMonoBold9pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
+
+#define EPD_RST_PIN  21       
+#define EPD_BUSY_PIN 20   
+#define EPD_DC_PIN   22
+#define EPD_CS_PIN   23 
+
+GxIO_Class io(SPI, EPD_CS_PIN, EPD_DC_PIN, EPD_RST_PIN);
+GxEPD_Class display(io, EPD_RST_PIN, EPD_BUSY_PIN);
+// EPaper setup
+
+
+ // Pin definitions Stephans AskSinPP 1284 Board v1.3
  #define CC1101_CS_PIN       4
  #define CC1101_GDO0_PIN     2
  #define CC1101_SCK_PIN      7 
@@ -43,11 +63,6 @@
  #define CONFIG_BUTTON_PIN 13
  #define CC1101_PWR_SW_PIN 27
  #define CALIB_BUTTON_PIN  11  //actually meant as 1Wire Pin, reused for button
-#else
-  // Stephans AskSinPP Universal Board v1.0
-  #define LED_PIN 6
-  #define CONFIG_BUTTON_PIN 5
-#endif
 
 
 #define PEERS_PER_CHANNEL 6
@@ -100,7 +115,7 @@ class Hal : public BaseHal {
       radio.initReg(CC1101_FREQ0, 0xE8);
 #endif
       // measure battery every a*b*c seconds
-      battery.init(seconds2ticks(60UL * 60 * 6), sysclock);  // 60UL * 60 for 1hour
+      battery.init(seconds2ticks(60UL * 30 * 1), sysclock);  // 60UL * 60 for 1hour
       battery.low(BAT_VOLT_LOW);
       battery.critical(BAT_VOLT_CRITICAL);
     }
@@ -109,6 +124,15 @@ class Hal : public BaseHal {
       return sysclock.runready() || BaseHal::runready();
     }
 } hal;
+
+
+typedef struct {
+  uint16_t co2 = 0;
+  float temperature = 0;
+  uint8_t humidity = 0;
+} DisplayDataType;
+
+DisplayDataType DisplayData;
 
 
 DEFREGISTER(Reg0, MASTERID_REGS, DREG_LEDMODE, DREG_LOWBATLIMIT, DREG_TRANSMITTRYMAX, 0x20, 0x21, 0x22, 0x23, 0x24)
@@ -175,12 +199,17 @@ class WeatherEventMsg : public Message {
     }
 };
 
+void MeasurementsDisplay();
 
 class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
     WeatherEventMsg     msg;
     uint16_t            millis;
     uint16_t            pressureAmb = 1013; //mean pressure at sea level in hPa
     uint16_t            pressureNN = 0; //dummy value to be returned if no sensor measurement
+    uint16_t            co2 = 0;
+    uint16_t            temp10 = 0;
+    uint8_t             humidity = 0;
+            
 #if defined useBMP280
     Sens_BMP280       bmp280;
 #endif       
@@ -201,6 +230,9 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
         pressureNN = bmp280.pressureNN();
       #endif
       scd30.measure(pressureAmb);
+      co2 = scd30.carbondioxide();
+      temp10 = scd30.temperature();
+      humidity = scd30.humidity();
       DPRINT("Temp x10 / Hum / PressureNN x10 / PressureAmb / Batt x10 / CO2 = ");
       DDEC(scd30.temperature());DPRINT(" / ");
       DDEC(scd30.humidity());DPRINT(" / ");
@@ -216,6 +248,10 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       {
         device().sendPeerEvent(msg, *this);
       }
+      DisplayData.co2 = co2;
+      DisplayData.temperature = temp10 / 10.0;
+      DisplayData.humidity = humidity;            
+      display.drawPaged(MeasurementsDisplay);
     }
 
     uint32_t delay () {
@@ -309,6 +345,7 @@ void setup () {
   buttonISR(calibBtn, CALIB_BUTTON_PIN);  
   sdev.initDone();
   //DPRINT("List0 dump: "); sdev.getList0().dump();
+  display.init();
 }
 
 
@@ -326,4 +363,36 @@ void loop() {
     // if nothing to do - go to sleep
     hal.activity.savePower<Sleep<>>(hal);
   }
+}
+
+
+void MeasurementsDisplay()
+// uint16_t co2, float temperature, uint8_t humidity
+{
+  String strco2 = String(DisplayData.co2, DEC) + "ppm";
+  String strtemp = "Temp: " + String(DisplayData.temperature, 1) + "\337C";
+  String strhum =  "rH:   " + String(DisplayData.humidity, DEC) + "%";      
+  Serial.println(strtemp);
+  display.setRotation(1);
+  display.setTextColor(GxEPD_BLACK);
+  display.setFont(&FreeMonoBold24pt7b);  
+  int16_t tbx, tby; uint16_t tbw, tbh;
+  display.getTextBounds(strco2, 0, 0, &tbx, &tby, &tbw, &tbh);
+  // center bounding box by transposition of origin:
+  uint16_t x = ((display.width() - tbw) / 2) - tbx;
+  uint16_t y = ((display.height() - tbh) / 2) - tby;
+
+    display.fillScreen(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold24pt7b);
+    display.setCursor(x, 85);
+    display.print(strco2);
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setCursor(80, 30);
+    display.print("CO2:");  
+    display.setCursor(5, 150);
+    display.print(strtemp);
+    display.setCursor(5, 190);
+    display.print(strhum);  
+    display.fillRect(0,115,200,5,GxEPD_BLACK);      
+
 }
