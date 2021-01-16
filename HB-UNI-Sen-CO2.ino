@@ -7,14 +7,12 @@
 //- -----------------------------------------------------------------------------------------------------------------------
 
 //#define NDEBUG   // disable all serial debug messages  //necessary to fit 328p!!!
-// #define USE_CC1101_ALT_FREQ_86835  //use alternative frequency to compensate not correct working cc1101 modules
 //#define SENSOR_ONLY
 
 #define EI_NOTEXTERNAL
-#define M1284P // select pin config for ATMega1284p board
-#define useBMP280 //use pressure sensor fort compensation
+#define useBME280 //use pressure sensor fort compensation
 
-#define SCD30_MEASUREMENT_INTERVAL 8
+#define SCD30_MEASUREMENT_INTERVAL 8  // seconds
 #define SCD30_REFERENCE_CO2 410 // 410ppm used for forced calib in fresh air 
 #define BAT_VOLT_LOW        22  // 2.2V for 2x Eneloop 
 #define BAT_VOLT_CRITICAL   20  // 2.0V for 2x Eneloop
@@ -26,54 +24,34 @@
 #include <MultiChannelDevice.h>
 #include "sensors/Sens_SCD30.h"
 #include "sensors/tmBattery.h"  //SG: added from Tom's UniSensor project
-#if defined useBMP280
-  #include "sensors/Sens_BMP280.h"
+#if defined useBME280
+  #include "sensors/Sens_BME280.h"
 #endif
-
-// EPaper setup
-#include <GxEPD.h>
-#include <GxGDEH0154D67/GxGDEH0154D67.h>
-
-#include <GxIO/GxIO_SPI/GxIO_SPI.h>
-#include <GxIO/GxIO.h>
-
-#include <Fonts/FreeMonoBold9pt7b.h>
-#include <Fonts/FreeMonoBold12pt7b.h>
-#include <Fonts/FreeMonoBold18pt7b.h>
-#include <Fonts/FreeMonoBold24pt7b.h>
-
-#define EPD_RST_PIN  21       
-#define EPD_BUSY_PIN 20   
-#define EPD_DC_PIN   22
-#define EPD_CS_PIN   23 
-
-GxIO_Class io(SPI, EPD_CS_PIN, EPD_DC_PIN, EPD_RST_PIN);
-GxEPD_Class display(io, EPD_RST_PIN, EPD_BUSY_PIN);
-// EPaper setup
+#include "EPDisplay.h"
+#include "DuoLed.h"
+#include "UserButton.h"
 
 
- // Pin definitions Stephans AskSinPP 1284 Board v1.3
- #define CC1101_CS_PIN       4
- #define CC1101_GDO0_PIN     2
- #define CC1101_SCK_PIN      7 
- #define CC1101_MOSI_PIN     5 
- #define CC1101_MISO_PIN     6 
- #define LED_PIN 14             //LEDs on PD6 (Arduino Pin 14) and PD7 (Arduino Pin 15) 
- #define LED2_PIN 15
- #define CONFIG_BUTTON_PIN 13
- #define CC1101_PWR_SW_PIN 27
- #define CALIB_BUTTON_PIN  11  //actually meant as 1Wire Pin, reused for button
+// Pin definitions Stephan's HB-UNI-Sen-CO2 Board v1.0
+#define CC1101_CS_PIN       4
+#define CC1101_GDO0_PIN     2
+#define CC1101_SCK_PIN      7 
+#define CC1101_MOSI_PIN     5 
+#define CC1101_MISO_PIN     6 
+#define LED_PIN 12              
+#define LED2_PIN 15
+#define DUOLED_GN_PIN 18
+#define DUOLED_RT_PIN 19
+#define CONFIG_BUTTON_PIN 14
+#define USER_BUTTON_PIN  13 
+#define CC1101_PWR_SW_PIN 27
 
 
 #define PEERS_PER_CHANNEL 6
-//#define BATT_SENSOR tmBatteryResDiv<A0, A1, 5700>  //SG: taken from Tom's Unisensor01
-// tmBatteryLoad: sense pin A0, activation pin D9, Faktor = Rges/Rlow*1000, z.B. 10/30 Ohm, Faktor 40/10*1000 = 4000, 200ms Belastung vor Messung
-// 1248p has 2.56V ARef, 328p has 1.1V ARef
-#if defined M1284P
-  #define BATT_SENSOR tmBatteryLoad<A6, 12, (uint16_t)(4000.0*2.56/1.1), 200>  
-#else
-  #define BATT_SENSOR tmBatteryLoad<A6, 12, 4000, 200>  
-#endif
+// tmBatteryLoad: sense pin A6, activation pin 26, Faktor = Rges/Rlow*1000, z.B. 10/30 Ohm, Faktor 40/10*1000 = 4000, 200ms Belastung vor Messung
+// 1248p has 2.56V ARef, 328p has 1.1V ARef, so output needs to be scaled up
+#define BATT_SENSOR tmBatteryLoad<A6, 26, (uint16_t)(4000.0*2.56/1.1), 200>  
+
 
 
 // all library classes are placed in the namespace 'as'
@@ -89,33 +67,24 @@ const struct DeviceInfo PROGMEM devinfo = {
   {0x01, 0x00}            // Info Bytes
 };
 
-/**
-   Configure the used hardware
-*/
-#if defined M1284P
-  typedef AvrSPI<CC1101_CS_PIN, CC1101_MOSI_PIN, CC1101_MISO_PIN, CC1101_SCK_PIN> SPIType;
-  typedef Radio<SPIType, CC1101_GDO0_PIN> RadioType;
-#else
-  typedef AvrSPI<10, 11, 12, 13> SPIType;
-  typedef Radio<SPIType, 2> RadioType;
-#endif
 
+
+
+//Configure the used hardware
+typedef AvrSPI<CC1101_CS_PIN, CC1101_MOSI_PIN, CC1101_MISO_PIN, CC1101_SCK_PIN> SPIType;
+typedef Radio<SPIType, CC1101_GDO0_PIN> RadioType;
 typedef StatusLed<LED_PIN> LedType;
-typedef StatusLed<LED2_PIN> Led2Type;
-//typedef AskSin<LedType, BatterySensor, RadioType> BaseHal;
 typedef AskSin<LedType, BATT_SENSOR, RadioType> BaseHal;
+typedef StatusLed<LED2_PIN> Led2Type;
+typedef DuoLed<DUOLED_GN_PIN, DUOLED_RT_PIN> DuoLedType;
+
+
 class Hal : public BaseHal {
   public:
     void init (const HMID& id) {
       BaseHal::init(id);
-#ifdef USE_CC1101_ALT_FREQ_86835
-      // 2165E8 == 868.35 MHz
-      radio.initReg(CC1101_FREQ2, 0x21);
-      radio.initReg(CC1101_FREQ1, 0x65);
-      radio.initReg(CC1101_FREQ0, 0xE8);
-#endif
       // measure battery every a*b*c seconds
-      battery.init(seconds2ticks(60UL * 30 * 1), sysclock);  // 60UL * 60 for 1hour
+      battery.init(seconds2ticks(60UL * 30 * 1), sysclock);  
       battery.low(BAT_VOLT_LOW);
       battery.critical(BAT_VOLT_CRITICAL);
     }
@@ -126,16 +95,7 @@ class Hal : public BaseHal {
 } hal;
 
 
-typedef struct {
-  uint16_t co2 = 0;
-  float temperature = 0;
-  uint8_t humidity = 0;
-} DisplayDataType;
-
-DisplayDataType DisplayData;
-
-
-DEFREGISTER(Reg0, MASTERID_REGS, DREG_LEDMODE, DREG_LOWBATLIMIT, DREG_TRANSMITTRYMAX, 0x20, 0x21, 0x22, 0x23, 0x24)
+DEFREGISTER(Reg0, MASTERID_REGS, DREG_LEDMODE, DREG_TRANSMITTRYMAX, 0x20, 0x21, 0x22, 0x23, 0x24)
 class SensorList0 : public RegList0<Reg0> {
   public:
     SensorList0(uint16_t addr) : RegList0<Reg0>(addr) {}
@@ -165,7 +125,6 @@ class SensorList0 : public RegList0<Reg0> {
     void defaults () {
       clear();
       ledMode(1);
-      lowBatLimit(BAT_VOLT_LOW);
       transmitDevTryMax(3);     
       updIntervall(11); //seconds
       altitude(62); //meters
@@ -199,7 +158,8 @@ class WeatherEventMsg : public Message {
     }
 };
 
-void MeasurementsDisplay();
+
+
 
 class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
     WeatherEventMsg     msg;
@@ -209,14 +169,17 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     uint16_t            co2 = 0;
     uint16_t            temp10 = 0;
     uint8_t             humidity = 0;
-            
-#if defined useBMP280
-    Sens_BMP280       bmp280;
+    DuoLedType          trafficLight; 
+    bool                trafficLightEnabled = false;    
+    Sens_SCD30 scd30;        
+#if defined useBME280
+    Sens_BME280       bme280;
 #endif       
-    public : Sens_SCD30 scd30;  // needs to be public for forced calib and stop measurement by external triggers
+       
 
   public:
     WeatherChannel () : Channel(), Alarm(10), millis(0) {}
+    
     virtual ~WeatherChannel () {}
 
     virtual void trigger (__attribute__ ((unused)) AlarmClock& clock) {
@@ -224,15 +187,16 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       // reactivate for next measure
       tick = delay();
       clock.add(*this);
-      #if defined useBMP280
-        bmp280.measure(this->device().getList0().altitude());
-        pressureAmb = bmp280.pressureAmb()/10;
-        pressureNN = bmp280.pressureNN();
+      #if defined useBME280
+        bme280.measure(this->device().getList0().altitude());
+        pressureAmb = bme280.pressure()/10;
+        pressureNN = bme280.pressureNN();
       #endif
       scd30.measure(pressureAmb);
       co2 = scd30.carbondioxide();
       temp10 = scd30.temperature();
       humidity = scd30.humidity();
+      
       DPRINT("Temp x10 / Hum / PressureNN x10 / PressureAmb / Batt x10 / CO2 = ");
       DDEC(scd30.temperature());DPRINT(" / ");
       DDEC(scd30.humidity());DPRINT(" / ");
@@ -240,29 +204,38 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       DDEC(pressureAmb);DPRINT(" / ");     
       DDEC(device().battery().current() / 10);DPRINT(" / ");
       DDECLN(scd30.carbondioxide());
+      
       msg.init( msgcnt, scd30.temperature(), scd30.humidity(), pressureNN, scd30.carbondioxide(), device().battery().current() / 10, device().battery().low());
-      if (msg.flags() & Message::BCAST) {
+      if (msg.flags() & Message::BCAST) 
+      {
         device().broadcastEvent(msg, *this);
       }
       else
       {
         device().sendPeerEvent(msg, *this);
       }
+      
       DisplayData.co2 = co2;
       DisplayData.temperature = temp10 / 10.0;
-      DisplayData.humidity = humidity;            
-      display.drawPaged(MeasurementsDisplay);
+      DisplayData.humidity = humidity;   
+      DisplayData.lowbatt = device().battery().low();    
+      //display.drawPaged(MeasurementsDisplay);
+     
+      setTrafficLight();
     }
+
 
     uint32_t delay () {
       return seconds2ticks(this->device().getList0().updIntervall());
     }
+    
     void setup(Device<Hal, SensorList0>* dev, uint8_t number, uint16_t addr) {
       Channel::setup(dev, number, addr);
       scd30.init(this->device().getList0().altitude(), device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL, false);
-      #if defined useBMP280
-        bmp280.init();
-      #endif     
+      #if defined useBME280
+        bme280.init();
+      #endif
+      trafficLight.init();
       sysclock.add(*this);
     }
 
@@ -273,14 +246,52 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     uint8_t flags () const {
       return 0;
     }
+
+
+    bool forceCalibSCD30(uint16_t calibValue = 400)
+    {
+      return(scd30.setForcedRecalibrationFactor(calibValue));
+    }
+
+
+    void stopSCD30()
+    {
+      scd30.stop_measurements();   
+    }
+
+
+    void setTrafficLight()
+    {
+      if (trafficLightEnabled)
+      {
+        if (co2 < 1000) trafficLight.setGreen();
+        if ((co2 >= 1000) and (co2 < 2000)) trafficLight.setAmber();
+        if (co2 >= 2000) trafficLight.setRed();
+      }
+      else
+      {
+        trafficLight.setOff();
+      }
+    }
+
+    void toggleTrafficLight()
+    {
+      trafficLightEnabled = !trafficLightEnabled;
+      setTrafficLight();
+    }
 };
+
+
 
 
 class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> {
   public:
     typedef MultiChannelDevice<Hal, WeatherChannel, 1, SensorList0> TSDevice;
+    Led2Type    led2;
+    
     SensChannelDevice(const DeviceInfo& info, uint16_t addr) : TSDevice(info, addr) 
     {
+      led2.init();
     }
     
     virtual ~SensChannelDevice () {}
@@ -289,7 +300,6 @@ class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, Sens
       TSDevice::configChanged();
       DPRINTLN("* Config Changed       : List0");
       DPRINT(F("* LED Mode             : ")); DDECLN(this->getList0().ledMode());    
-      DPRINT(F("* Low Bat Limit        : ")); DDECLN(this->getList0().lowBatLimit()); 
       DPRINT(F("* Sendeversuche        : ")); DDECLN(this->getList0().transmitDevTryMax());                   
       DPRINT(F("* SENDEINTERVALL       : ")); DDECLN(this->getList0().updIntervall());
       DPRINT(F("* Hoehe ueber NN       : ")); DDECLN(this->getList0().altitude());
@@ -299,50 +309,19 @@ class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, Sens
 
 
 
-class CalibButton : public Button {
-  SensChannelDevice& device;
-  Led2Type led;
-
-public:
-  CalibButton (SensChannelDevice& dev, uint8_t longpresstime=3) : device(dev) {
-    this->setLongPressTime(seconds2ticks(longpresstime));
-    led.init();
-  }
- 
-  virtual ~CalibButton () {}
- 
-  virtual void state (uint8_t s) {
-    uint8_t old = Button::state();
-    Button::state(s);
-    if( s == Button::released ) {
-      DPRINTLN("Calib Btn released");
-      bool fc = device.channel(0).scd30.setForcedRecalibrationFactor(SCD30_REFERENCE_CO2);
-      if (fc==true) {
-        led.set(LedStates::send);
-      }
-      else {
-        led.set(LedStates::failure);
-      }
-    }
-  }
-};
-
-
-
 SensChannelDevice sdev(devinfo, 0x20);
 ConfigButton<SensChannelDevice> cfgBtn(sdev);
-CalibButton calibBtn(sdev);
-
+UserButton<SensChannelDevice> usrBtn(sdev);
 
 
 void setup () {
-  //SG: switch on MOSFET to power CC1101
+  //SG: switch on MOSFET to power CC1101 and sensors
   pinMode(CC1101_PWR_SW_PIN, OUTPUT);
   digitalWrite (CC1101_PWR_SW_PIN, LOW);
   DINIT(57600, ASKSIN_PLUS_PLUS_IDENTIFIER);
   sdev.init(hal);
   buttonISR(cfgBtn, CONFIG_BUTTON_PIN);
-  buttonISR(calibBtn, CALIB_BUTTON_PIN);  
+  buttonISR(usrBtn, USER_BUTTON_PIN);  
   sdev.initDone();
   //DPRINT("List0 dump: "); sdev.getList0().dump();
   display.init();
@@ -356,43 +335,15 @@ void loop() {
     if (hal.battery.critical()) {
       // this call will never return
       DPRINTLN("!!!Shutting down due to critical battery voltage!!!");
-      sdev.channel(0).scd30.stop_measurements();          
-      delay(100);
+      sdev.channel(0).stopSCD30();           
+      display.drawPaged(EmptyBattDisplay);
+      //wait a bit to let paged epd refresh finish
+      delay(5000);
+      pinMode(CC1101_PWR_SW_PIN, INPUT);
       hal.activity.sleepForever(hal);      
     }    
     // if nothing to do - go to sleep
+    DPRINTLN("...zzz");
     hal.activity.savePower<Sleep<>>(hal);
   }
-}
-
-
-void MeasurementsDisplay()
-// uint16_t co2, float temperature, uint8_t humidity
-{
-  String strco2 = String(DisplayData.co2, DEC) + "ppm";
-  String strtemp = "Temp: " + String(DisplayData.temperature, 1) + "\337C";
-  String strhum =  "rH:   " + String(DisplayData.humidity, DEC) + "%";      
-  Serial.println(strtemp);
-  display.setRotation(1);
-  display.setTextColor(GxEPD_BLACK);
-  display.setFont(&FreeMonoBold24pt7b);  
-  int16_t tbx, tby; uint16_t tbw, tbh;
-  display.getTextBounds(strco2, 0, 0, &tbx, &tby, &tbw, &tbh);
-  // center bounding box by transposition of origin:
-  uint16_t x = ((display.width() - tbw) / 2) - tbx;
-  uint16_t y = ((display.height() - tbh) / 2) - tby;
-
-    display.fillScreen(GxEPD_WHITE);
-    display.setFont(&FreeMonoBold24pt7b);
-    display.setCursor(x, 85);
-    display.print(strco2);
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setCursor(80, 30);
-    display.print("CO2:");  
-    display.setCursor(5, 150);
-    display.print(strtemp);
-    display.setCursor(5, 190);
-    display.print(strhum);  
-    display.fillRect(0,115,200,5,GxEPD_BLACK);      
-
 }

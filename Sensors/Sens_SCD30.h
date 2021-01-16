@@ -16,7 +16,9 @@
 #include <Wire.h>
 #include "SparkFun_SCD30_Arduino_Library.h" //Click here to get the library: http://librarymanager/All#SparkFun_SCD30
 
-#define COMMAND_STOP_MEASUREMENT 0x0104 // supplemented in order to stop the measurements in case of an empty accumulator battery
+#define COMMAND_STOP_MEASUREMENT        0x0104 // supplemented in order to stop the measurements in case of an empty accumulator battery
+#define COMMAND_SOFT_RESET              0xD304 // supplemented to use before begin in case low battery caused undefined state
+#define COMMAND_READ_FIRMWARE_VERSION   0xD100
 
 namespace as {
 
@@ -32,7 +34,7 @@ class Sens_SCD30 : public Sensor {
         DPRINTLN("");
         while (!_scd30.dataAvailable())
         {
-            delay(200);
+            delay(100);
             DPRINT(".");
             if (_scd30.dataAvailable())
             {
@@ -60,14 +62,12 @@ public:
     void init(uint16_t altitude, uint16_t temperature_correction, uint16_t measurement_interval, bool auto_self_calib)
     {
         Wire.begin();
-
+        //_scd30.sendCommand(COMMAND_SOFT_RESET);
         delay(200);
 
         if (_scd30.begin() == false)
         {
           DPRINTLN("Error: no Sensirion SCD30 CO2 sensor found");
-          DPRINTLN("Please check wiring. Freezing...");
-          while (1);
         }
         else
         {
@@ -106,6 +106,12 @@ public:
         if (_present == true) {
             _scd30.setAmbientPressure(pressureAmb);
             measureRaw();
+            DPRINT(F("SCD30   Temperature   : "));
+            DDECLN(_temperature);
+            DPRINT(F("SCD30   Humidity      : "));
+            DDECLN(_humidity);
+            DPRINT(F("SCD30   CO2           : "));
+            DDECLN(_carbondioxide);
         }
     }
 
@@ -113,6 +119,12 @@ public:
     void measure()
     {
       measure(1013); //overload: if no ambient pressure passed, use mean pressure at sea level
+    }
+
+
+    void read_firmware_version()
+    {
+      DPRINTLN("bla");
     }
 
     int16_t  temperature() { return _temperature; }
