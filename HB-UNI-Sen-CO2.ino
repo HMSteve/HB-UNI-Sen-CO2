@@ -220,6 +220,8 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       DisplayData.humidity = humidity;   
       DisplayData.lowbatt = device().battery().low();    
       //display.drawPaged(MeasurementsDisplay);
+      ePaper.mustUpdateDisplay(true);
+      ePaper.setRefreshAlarm(500);      
      
       setTrafficLight();
     }
@@ -343,7 +345,7 @@ void loop() {
       hal.activity.sleepForever(hal);      
     }    
     // if nothing to do - go to sleep
-    DPRINTLN("...zzz");
+    //DPRINTLN("...zzz");
     hal.activity.savePower<Sleep<>>(hal);
   }
 }
