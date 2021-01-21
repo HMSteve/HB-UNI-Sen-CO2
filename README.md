@@ -29,7 +29,7 @@ Sofern noch nicht vorhanden oder nicht aktuell, ist das [Addon](https://github.c
 ### Firmware
 
 Es wird ein ATMega1284p verwendet, da der Speicherplatz des ATMega328p nicht ausreicht. Deshalb ist bei Nutzung der Arduino IDE zunaechst eine zusaetzliche sog. Boardverwalter-URL (https://mcudude.github.io/MightyCore/package_MCUdude_MightyCore_index.json) in den Voreinstellungen zu hinterlegen. Folgende Boardeinstellungen sind dann auszuwaehlen:
-![Boardeinstellungen](https://github.com/HMSteve/HB-UNI-Sen-CO2/tree/main/Images/arduino_board_config.jpg)
+![Boardeinstellungen](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/arduino_board_config.jpg)
 
 Danach kann der Bootloader geflashed werden.
 
