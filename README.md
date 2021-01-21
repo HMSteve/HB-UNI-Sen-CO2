@@ -1,6 +1,6 @@
 # HB-UNI-Sen-CO2
 
-![HB-UNI-Sen-CO2](https://github.com/HMSteve/HB-UNI-Sen-CO2/tree/main/Images/dev_front.jpg)
+![HB-UNI-Sen-CO2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/dev_front.jpg)
 
 Eine AskSinPP-Implementierung eines Innenraum-Sensos mit dem NDIR-CO2-Sensor SCD30. Das Geraet kann regulaer in eine Homematic-Umgebung eingebunden werden und liefert Messwerte fuer die CO2-Konzentration, Temperatur und Lueftfeuchte. Ebenso kann es abseits einer Homematic-Installation stand-alone als "CO2-Ampel" verwendet werden: Die Messwerte werden auf einem E-Paper-Display angezeigt und es kann eine Indikator-LED fuer die CO2-Konzentration zugeschaltet werden. Der Betrieb erfolgt mittels zweier AA-NiMH-Akkus, auf Li-Po/Li-Ionen-Akkus wurde unter Sicherheitsaspekten bewusst verzichtet. Eine Ladeschaltung mit Micro-USB-Buchse ist eingebaut. Ueber diese erfolgt eine Schnelladung mit C/4 sowie auf Wunsch parallel zu einer "Erhaltungsladung" die Versorgung des Sensors. Hierzu dient ein uebliches USB-Ladegeraet, das mind. 500mA dauerhaft liefern koennen muss.
 
@@ -11,13 +11,13 @@ Auf der Platine sind drei I2C-Steckplaetze fuer Sensoren vorgesehen. Neben dem [
 Als Display findet ein [1.54" Waveshare-E-Paper-Modul](https://www.waveshare.com/1.54inch-e-Paper-Module.htm) Verwendung.
 
 
-![PCB Top](https://github.com/HMSteve/HB-UNI-Sen-CO2/tree/main/Images/pcb_top_1.jpg)
+![PCB Top](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/pcb_top_1.jpg)
 
-![PCB Bottom](https://github.com/HMSteve/HB-UNI-Sen-CO2/tree/main/Images/pcb_bot_1.jpg)
+![PCB Bottom](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/pcb_bot_1.jpg)
 
-![PCB Top 2](https://github.com/HMSteve/HB-UNI-Sen-CO2/tree/main/Images/pcb_top_2.jpg)
+![PCB Top 2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/pcb_top_2.jpg)
 
-![PCB Bottom 2](https://github.com/HMSteve/HB-UNI-Sen-CO2/tree/main/Images/pcb_bot_2.jpg)
+![PCB Bottom 2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/pcb_bot_2.jpg)
 
 
 ## Software
