@@ -2,7 +2,7 @@
 
 ![HB-UNI-Sen-CO2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/dev_front.jpg)
 
-Eine AskSinPP-Implementierung eines Innenraum-Sensos mit dem NDIR-CO2-Sensor SCD30. Das Geraet kann regulaer in eine Homematic-Umgebung eingebunden werden und liefert Messwerte fuer die CO2-Konzentration, Temperatur und Lueftfeuchte. Ebenso kann es abseits einer Homematic-Installation stand-alone als "CO2-Ampel" verwendet werden: Die Messwerte werden auf einem E-Paper-Display angezeigt und es kann eine Indikator-LED fuer die CO2-Konzentration zugeschaltet werden. Der Betrieb erfolgt mittels zweier AA-NiMH-Akkus, auf Li-Po/Li-Ionen-Akkus wurde unter Sicherheitsaspekten bewusst verzichtet. Eine Ladeschaltung mit Micro-USB-Buchse ist eingebaut. Ueber diese erfolgt eine Schnelladung mit C/4 sowie auf Wunsch parallel zu einer "Erhaltungsladung" die Versorgung des Sensors. Hierzu dient ein uebliches USB-Ladegeraet, das mind. 500mA dauerhaft liefern koennen muss.
+Eine AskSinPP-Implementierung eines Innenraum-Sensors mit dem NDIR-CO2-Sensor SCD30. Das Geraet kann regulaer in eine Homematic-Umgebung eingebunden werden und liefert Messwerte fuer die CO2-Konzentration, Temperatur und Lueftfeuchte. Ebenso kann es abseits einer Homematic-Installation stand-alone als "CO2-Ampel" verwendet werden: Die Messwerte werden auf einem E-Paper-Display angezeigt und es kann eine Indikator-LED fuer die CO2-Konzentration zugeschaltet werden. Der Betrieb erfolgt mittels zweier AA-NiMH-Akkus, auf Li-Po/Li-Ionen-Akkus wurde unter Sicherheitsaspekten bewusst verzichtet. Eine Ladeschaltung mit Micro-USB-Buchse ist eingebaut. Ueber diese erfolgt eine Schnelladung mit C/4 sowie auf Wunsch parallel zu einer "Erhaltungsladung" die Versorgung des Sensors. Hierzu dient ein uebliches USB-Ladegeraet, das mind. 500mA dauerhaft liefern koennen muss.
 
 
 ## Platine
@@ -18,6 +18,8 @@ Als Display findet ein [1.54" Waveshare-E-Paper-Modul](https://www.waveshare.com
 ![PCB Top 2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/pcb_top_2.jpg)
 
 ![PCB Bottom 2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/pcb_bot_2.jpg)
+
+Hinweis: Da leider das Displaymodul und nicht der aktive Displaybereich mittig auf der Platine angeordnet wurden, ist die Duo-LED vor dem Gehaeuseeinbau durch Zurechtbiegen der Anschluesse ca. 3mm versetzt zu bestuecken. Die 3mm-LEDs duerfen den Platinenrand nur wenig ueberragen, um den Einbau ins Gehaeuse zu ermoeglichen.
 
 
 ## Software
@@ -47,14 +49,14 @@ Anschliessend sollte die Firmware problemlos kompilierbar und das Device nach de
 
 ## Bedienung
 
-Es gibt neben der AskSinPP-Config-Taste eine weitere Bedientaste. Ein kurzer Druck auf diese schaltet die Ampel-LED ein bzw. aus, ein langer Druck fuehrt zu einer forced calibration des SCD30. Hierzu sollte sich der Sensor einige Minuten an der frischen Luft ohne nennenswerte Druckschwankungen durch Wind befunden haben. Der lange Tastendruck kalibriert dann den sensor auf 410ppm CO2-Konzentration. Die automatische Kalibrierung wird nicht verwendet auf Basis der These, dass ein Wegdriften der Auot-Kalibrierung bei nicht ausreichendem regelmaessigen Lueften problematischer ist als die Alterungsdrift nach forced calibration. Langzeitbeobachtungen hierzu fehlen mir jedoch.
+Es gibt neben der AskSinPP-Config-Taste eine weitere Bedientaste. Ein kurzer Druck auf diese schaltet die Ampel-LED ein bzw. aus, ein langer Druck fuehrt zu einer forced calibration des SCD30. Hierzu sollte sich der Sensor einige Minuten an der frischen Luft ohne nennenswerte Druckschwankungen durch Wind befunden haben. Der lange Tastendruck kalibriert dann den sensor auf 410ppm CO2-Konzentration. Die automatische Kalibrierung wird nicht verwendet auf Basis der These, dass ein Wegdriften der Auto-Kalibrierung bei nicht ausreichendem regelmaessigem Lueften problematischer ist als die Alterungsdrift nach forced calibration. Langzeitbeobachtungen hierzu fehlen mir jedoch.
 
 Unterschreitet die Akkuspannung 2.2V, wird ein Warnsymbol im Display angezeigt und ein USB-Ladegerate sollte angeschlossen werden. Geschieht das nicht und die Spannung sinkt unter 2.0V, schaltet sich der Sensor zum Schutz vor Tiefentladung ab und zeigt dies an. Ein Reset (Wiedereinschalten) erfolgt automatisch beim Anschluss eines Ladegeraetes. Die gruene LED zeigt das Anliegen der Ladespannung, die gelbe den Schnelladevorgang. Es ist zu beachten, dass die Erwaermung beim Schnelladen natuerlich die Messwerte im Gehaeuse verfaelscht.
 
 
 ## Gehaeuse
 
-Zwischen Display und Platine sind vier zu druckende Abstandshuelsen einzusetzen. Das Gehaeuse stellt beim Drucken keine groesseren Herausforderungen. Fuer die Befestigung der Platine sind Einpressmuttern vorgesehen.
+Zwischen Display und Platine sind vier zu druckende Abstandshuelsen einzusetzen. Das Gehaeuse stellt beim Drucken keine groesseren Herausforderungen. Fuer die Befestigung der Platine sind Einpressmuttern vorgesehen. Die LED-Loecher sind ggf. mit 10.5mm bzw. 3.5mm aufzubohren, die Loecher im Boden mit 3mm.
 
 
 ## Disclaimer
