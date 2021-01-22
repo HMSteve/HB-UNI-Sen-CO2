@@ -2,7 +2,7 @@
 
 ![HB-UNI-Sen-CO2](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/dev_front.jpg)
 
-Eine AskSinPP-Implementierung eines Innenraum-Sensors mit dem NDIR-CO2-Sensor SCD30. Das Geraet kann regulaer in eine Homematic-Umgebung eingebunden werden und liefert Messwerte fuer die CO2-Konzentration, Temperatur, Lueftfeuchte und bei bestuecktem BME280 auch Luftdruck. Ebenso kann es abseits einer Homematic-Installation stand-alone als "CO2-Ampel" verwendet werden: Die Messwerte werden auf einem E-Paper-Display angezeigt und es kann eine Indikator-LED fuer die CO2-Konzentration zugeschaltet werden. Der Betrieb erfolgt mittels zweier AA-NiMH-Akkus, auf Li-Po/Li-Ionen-Akkus wurde unter Sicherheitsaspekten bewusst verzichtet. Eine Ladeschaltung mit Micro-USB-Buchse ist eingebaut. Ueber diese erfolgt eine Schnelladung mit 500mA sowie auf Wunsch parallel zu einer "Erhaltungsladung" die Versorgung des Sensors. Hierzu dient ein uebliches USB-Ladegeraet, das mind. 1A dauerhaft liefern koennen sollte.
+Eine AskSinPP-Implementierung eines Innenraum-Sensors mit dem NDIR-CO2-Sensor SCD30. Das Geraet kann regulaer in eine Homematic-Umgebung eingebunden werden und liefert Messwerte fuer die CO2-Konzentration, Temperatur, Lueftfeuchte und bei bestuecktem BME280 auch Luftdruck. Ebenso kann es abseits einer Homematic-Installation stand-alone als "CO2-Ampel" verwendet werden: Die Messwerte werden auf einem E-Paper-Display angezeigt und es kann eine Indikator-LED fuer die CO2-Konzentration zugeschaltet werden. Der Betrieb erfolgt mittels zweier AA-NiMH-Akkus, auf Li-Po/Li-Ionen-Akkus wurde unter Sicherheitsaspekten bewusst verzichtet. Eine Ladeschaltung mit Micro-USB-Buchse ist eingebaut. Ueber diese erfolgt eine Schnelladung mit 500mA sowie auf Wunsch parallel zu einer "Erhaltungsladung" die dauerhafte Versorgung des Sensors. Hierzu dient ein uebliches USB-Ladegeraet, das mind. 1A dauerhaft liefern koennen sollte.
 
 
 ## Platine
@@ -61,7 +61,7 @@ Unterschreitet die Akkuspannung 2.2V, wird ein Warnsymbol im Display angezeigt u
 
 Die Schaltschwellen der Ampelfarben, die Hoehe ueber NN sowie ein vom SCD30-Temperaturmesswert zu subtrahierender Offset zur Korrektur der Anzeige koennen im WebUI konfiguriert werden.
 
-![WebUI Config](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/webui_config.jpg)
+![WebUI Settings](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/webui_settings.jpg)
 
 Die Messwerte werden dann so angezeigt:
 
