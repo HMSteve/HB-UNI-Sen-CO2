@@ -14,14 +14,13 @@ public:
   virtual void state (uint8_t s) {
     uint8_t old = Button::state();
     Button::state(s);
-    DPRINT("usr btn state : ");DPRINTLN(s);
     if( s == Button::released ) {
       device.channel(0).toggleTrafficLight();
       device.led2.set(LedStates::send);  
     }    
     else if( s == Button::longpressed ) {
       DPRINTLN("SCD30: setting forced recalibration factor");
-      bool fc = device.channel(0).forceCalibSCD30(SCD30_REFERENCE_CO2);
+      bool fc = device.channel(0).forceCalibSCD30();
       if (fc==true) {
         device.led2.set(LedStates::key_long);
       }

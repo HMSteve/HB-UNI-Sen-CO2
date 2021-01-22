@@ -37,7 +37,7 @@ void MeasurementsDisplay()
   
   String strco2  = String(DisplayData.co2, DEC);
   String strtemp = String(DisplayData.temperature, 1);
-  String strhum  =  String(DisplayData.humidity, DEC);   
+  String strhum  =  String(DisplayData.humidity, DEC);  
   String strstatic = "";   
   
   display.setRotation(1);
@@ -108,7 +108,6 @@ void MeasurementsDisplay()
 
   if (DisplayData.lowbatt)
   {
-      DPRINTLN("DisplayData.LowBatt!");
       display.drawRect(15,25,11,5,GxEPD_BLACK);       
       display.drawRect(10,30,20,30,GxEPD_BLACK);         
       display.fillRect(10,60,20,10,GxEPD_BLACK);    
@@ -167,6 +166,7 @@ private:
   bool                 waiting;
   uint16_t             clFG;
   uint16_t             clBG;
+
 public:
   ePaperType () :  Alarm(0), mUpdateDisplay(false), shEmptyBattDisplay(false), inverted(false), waiting(false), clFG(GxEPD_BLACK), clBG(GxEPD_WHITE)  {}
   virtual ~ePaperType () {}
@@ -260,4 +260,4 @@ public:
     }
   }
   
-} ePaper;
+};

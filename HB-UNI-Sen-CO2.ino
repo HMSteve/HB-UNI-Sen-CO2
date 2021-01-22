@@ -13,7 +13,6 @@
 #define useBME280 //use pressure sensor fort compensation
 
 #define SCD30_MEASUREMENT_INTERVAL 8  // seconds
-#define SCD30_REFERENCE_CO2 410 // 410ppm used for forced calib in fresh air 
 #define BAT_VOLT_LOW        22  // 2.2V for 2x Eneloop 
 #define BAT_VOLT_CRITICAL   20  // 2.0V for 2x Eneloop
 
@@ -126,11 +125,51 @@ class SensorList0 : public RegList0<Reg0> {
       clear();
       ledMode(1);
       transmitDevTryMax(3);     
-      updIntervall(11); //seconds
+      updIntervall(183); //seconds
       altitude(62); //meters
       tempOffset10(0); //temperature offset for SCD30 calib: 15 means 1.5K
     }
 };
+
+
+
+DEFREGISTER(Reg1, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06)
+class SensorList1 : public RegList1<Reg1> {
+  public:
+    SensorList1 (uint16_t addr) : RegList1<Reg1>(addr) {}
+
+    bool co2CalibRef (uint16_t value) const {
+      return this->writeRegister(0x01, (value >> 8) & 0xff) && this->writeRegister(0x02, value & 0xff);
+    }
+    
+    uint16_t co2CalibRef () const {
+      return (this->readRegister(0x01, 0) << 8) + this->readRegister(0x02, 0);
+    }
+
+    bool co2StateAmber (uint16_t value) const {
+      return this->writeRegister(0x03, (value >> 8) & 0xff) && this->writeRegister(0x04, value & 0xff);
+    }
+    
+    uint16_t co2StateAmber () const {
+      return (this->readRegister(0x03, 0) << 8) + this->readRegister(0x04, 0);
+    }
+
+    bool co2StateRed (uint16_t value) const {
+      return this->writeRegister(0x05, (value >> 8) & 0xff) && this->writeRegister(0x06, value & 0xff);
+    }
+    
+    uint16_t co2StateRed () const {
+      return (this->readRegister(0x05, 0) << 8) + this->readRegister(0x06, 0);
+    }
+
+    void defaults () {
+      clear();
+      co2CalibRef(410);
+      co2StateAmber(1000);     
+      co2StateRed(2000); 
+    }
+};
+
 
 
 class WeatherEventMsg : public Message {
@@ -161,7 +200,7 @@ class WeatherEventMsg : public Message {
 
 
 
-class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
+class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
     WeatherEventMsg     msg;
     uint16_t            millis;
     uint16_t            pressureAmb = 1013; //mean pressure at sea level in hPa
@@ -171,9 +210,10 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     uint8_t             humidity = 0;
     DuoLedType          trafficLight; 
     bool                trafficLightEnabled = false;    
-    Sens_SCD30 scd30;        
+    ePaperType          ePaper;
+    Sens_SCD30          scd30;        
 #if defined useBME280
-    Sens_BME280       bme280;
+    Sens_BME280         bme280;
 #endif       
        
 
@@ -194,7 +234,7 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       #endif
       scd30.measure(pressureAmb);
       co2 = scd30.carbondioxide();
-      temp10 = scd30.temperature();
+      temp10 = scd30.temperature() - this->device().getList0().tempOffset10();
       humidity = scd30.humidity();
       
       DPRINT("Temp x10 / Hum / PressureNN x10 / PressureAmb / Batt x10 / CO2 = ");
@@ -219,7 +259,6 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
       DisplayData.temperature = temp10 / 10.0;
       DisplayData.humidity = humidity;   
       DisplayData.lowbatt = device().battery().low();    
-      //display.drawPaged(MeasurementsDisplay);
       ePaper.mustUpdateDisplay(true);
       ePaper.setRefreshAlarm(500);      
      
@@ -233,7 +272,7 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     
     void setup(Device<Hal, SensorList0>* dev, uint8_t number, uint16_t addr) {
       Channel::setup(dev, number, addr);
-      scd30.init(this->device().getList0().altitude(), device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL, false);
+      scd30.init(device().getList0().altitude(), this->device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL, false);
       #if defined useBME280
         bme280.init();
       #endif
@@ -250,9 +289,9 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     }
 
 
-    bool forceCalibSCD30(uint16_t calibValue = 400)
+    bool forceCalibSCD30()
     {
-      return(scd30.setForcedRecalibrationFactor(calibValue));
+      return(scd30.setForcedRecalibrationFactor(this->getList1().co2CalibRef()));
     }
 
 
@@ -266,9 +305,9 @@ class WeatherChannel : public Channel<Hal, List1, EmptyList, List4, PEERS_PER_CH
     {
       if (trafficLightEnabled)
       {
-        if (co2 < 1000) trafficLight.setGreen();
-        if ((co2 >= 1000) and (co2 < 2000)) trafficLight.setAmber();
-        if (co2 >= 2000) trafficLight.setRed();
+        if (co2 <= this->getList1().co2StateAmber()) trafficLight.setGreen();
+        if ((co2 > this->getList1().co2StateAmber()) and (co2 <= this->getList1().co2StateRed())) trafficLight.setAmber();
+        if (co2 > this->getList1().co2StateRed()) trafficLight.setRed();
       }
       else
       {
@@ -345,7 +384,6 @@ void loop() {
       hal.activity.sleepForever(hal);      
     }    
     // if nothing to do - go to sleep
-    //DPRINTLN("...zzz");
     hal.activity.savePower<Sleep<>>(hal);
   }
 }
