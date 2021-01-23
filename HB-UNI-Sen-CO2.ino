@@ -6,13 +6,12 @@
 // 2020-11-07 CO2 Sensor, HMSteve (cc)
 //- -----------------------------------------------------------------------------------------------------------------------
 
-//#define NDEBUG   // disable all serial debug messages  //necessary to fit 328p!!!
-//#define SENSOR_ONLY
+//#define NDEBUG   // disable all serial debug messages  
 
 #define EI_NOTEXTERNAL
-#define useBME280 //use pressure sensor fort compensation
+#define useBME280 //use pressure sensor for compensation
 
-#define SCD30_MEASUREMENT_INTERVAL 8  // seconds
+#define SCD30_MEASUREMENT_INTERVAL 16  // seconds
 #define BAT_VOLT_LOW        22  // 2.2V for 2x Eneloop 
 #define BAT_VOLT_CRITICAL   20  // 2.0V for 2x Eneloop
 
@@ -32,18 +31,18 @@
 
 
 // Pin definitions Stephan's HB-UNI-Sen-CO2 Board v1.0
-#define CC1101_CS_PIN       4
-#define CC1101_GDO0_PIN     2
-#define CC1101_SCK_PIN      7 
-#define CC1101_MOSI_PIN     5 
-#define CC1101_MISO_PIN     6 
-#define LED_PIN 12              
-#define LED2_PIN 15
-#define DUOLED_GN_PIN 18
-#define DUOLED_RT_PIN 19
-#define CONFIG_BUTTON_PIN 14
-#define USER_BUTTON_PIN  13 
-#define CC1101_PWR_SW_PIN 27
+#define CC1101_CS_PIN        4
+#define CC1101_GDO0_PIN      2
+#define CC1101_SCK_PIN       7 
+#define CC1101_MOSI_PIN      5 
+#define CC1101_MISO_PIN      6 
+#define LED_PIN             12              
+#define LED2_PIN            15
+#define DUOLED_GN_PIN       18
+#define DUOLED_RT_PIN       19
+#define CONFIG_BUTTON_PIN   14
+#define USER_BUTTON_PIN     13 
+#define CC1101_PWR_SW_PIN   27
 
 
 #define PEERS_PER_CHANNEL 6
@@ -164,7 +163,7 @@ class SensorList1 : public RegList1<Reg1> {
 
     void defaults () {
       clear();
-      co2CalibRef(410);
+      co2CalibRef(410); //410ppm in fresh air
       co2StateAmber(1000);     
       co2StateRed(2000); 
     }

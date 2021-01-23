@@ -19,12 +19,13 @@ public:
       device.led2.set(LedStates::send);  
     }    
     else if( s == Button::longpressed ) {
-      DPRINTLN("SCD30: setting forced recalibration factor");
       bool fc = device.channel(0).forceCalibSCD30();
       if (fc==true) {
+        DPRINTLN("SCD30: forced calibration done");       
         device.led2.set(LedStates::key_long);
       }
       else {
+        DPRINTLN("SCD30: forced calibration FAILED");          
         device.led2.set(LedStates::failure);
       }
     }

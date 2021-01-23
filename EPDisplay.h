@@ -162,38 +162,10 @@ private:
   bool                 mUpdateDisplay;
   bool                 shMeasurementsDisplay;
   bool                 shEmptyBattDisplay;
-  bool                 inverted;
-  bool                 waiting;
-  uint16_t             clFG;
-  uint16_t             clBG;
 
 public:
-  ePaperType () :  Alarm(0), mUpdateDisplay(false), shEmptyBattDisplay(false), inverted(false), waiting(false), clFG(GxEPD_BLACK), clBG(GxEPD_WHITE)  {}
+  ePaperType () :  Alarm(0), mUpdateDisplay(false), shEmptyBattDisplay(false) {}
   virtual ~ePaperType () {}
-
-  uint16_t ForegroundColor() {
-    return clFG;
-  }
-
-  void ForegroundColor(uint16_t c) {
-    clFG = c;
-  }
-
-  uint16_t BackgroundColor() {
-    return clBG;
-  }
-
-  void BackgroundColor(uint16_t c) {
-    clBG = c;
-  }
-
-  bool Inverted() {
-    return inverted;
-  }
-
-  void Inverted(bool i) {
-    inverted = i;
-  }
 
   bool showEmptyBattDisplay() {
     return shEmptyBattDisplay;
@@ -214,31 +186,14 @@ public:
   void init() {
     /*
     u8g2Fonts.begin(display);
-    display.setRotation(DISPLAY_ROTATE);
     u8g2Fonts.setFontMode(1);
     u8g2Fonts.setFontDirection(0);
     */
   }
 
-
-  void setDisplayColors() {
-    /*
-    u8g2Fonts.setForegroundColor(ForegroundColor());
-    u8g2Fonts.setBackgroundColor(BackgroundColor());
-    */
-  }
-
-  void isWaiting(bool w) {
-    waiting = w;
-    DPRINT("wait:"); DDECLN(waiting);
-  }
-
-  bool isWaiting() {
-    return waiting;
-  }
-
+ 
   void setRefreshAlarm (uint32_t t) {
-    isWaiting(true);
+    //isWaiting(true);
     sysclock.cancel(*this);
     Alarm::set(millis2ticks(t));
     sysclock.add(*this);
@@ -246,10 +201,8 @@ public:
   
   virtual void trigger (__attribute__((unused)) AlarmClock& clock) {
     DPRINTLN("ePaper refresh triggered");
-    isWaiting(false);
     if (this->mustUpdateDisplay()) {
       this->mustUpdateDisplay(false);
-      setDisplayColors();
       if (this->showEmptyBattDisplay() == true ) {
           display.drawPaged(EmptyBattDisplay);
           this->showEmptyBattDisplay(false);
