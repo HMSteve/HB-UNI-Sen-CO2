@@ -67,10 +67,21 @@ Die Messwerte werden dann so angezeigt:
 
 ![WebUI Status](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/webui_status.jpg)
 
+### Hinweise zum Energieverbrauch
+
+Der SCD30 zieht einen nennenswerten Ruhestrom (mind. 5mA). Ein Power Cycling wird vom Hersteller nicht empfohlen, siehe [hier](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Addl/CD_AN_SCD30_Low_Power_Mode_D2.pdf).
+Damit ist fuer das Geraet bei der Voreinstellung einer Sensor-Abtastperiode von 16s eine Akkulaufzeit von hoechstens 5 Tagen zu erwarten. Das heisst, der mobile Bertieb waehrend eines oder einiger (Arbeits)tage ist problemslos moeglich, der Dauerbetrieb sollte dann eher mit USB-Netzteil erfolgen.
+Hier eine Messung zum Stromverbrauch:
+
+![Power Consumption Detail](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Images/power_consumption_detail.jpg)
+
+Ein Excel-Workbook zum power budgeting findet sich [hier](https://github.com/HMSteve/HB-UNI-Sen-CO2/blob/main/Addl/BatteryBudgeting.xlsx).
+
 
 ## Gehaeuse
 
-Zwischen Display und Platine sind vier zu druckende Abstandshuelsen einzusetzen. Das Gehaeuse stellt beim Drucken keine groesseren Herausforderungen. Fuer die Befestigung der Platine sind [M3-Einpressmuttern](https://www.amazon.de/dp/B08BCRZZS3) vorgesehen. Die LED-Loecher sind ggf. mit 10.5mm bzw. 3.5mm aufzubohren, die Loecher im Boden mit 3mm.
+Zwischen Display und Platine sind vier zu druckende Abstandshuelsen einzusetzen. Das Gehaeuse stellt beim Drucken keine groesseren Herausforderungen. Die LED-Loecher sind ggf. mit 10.5mm bzw. 3.5mm aufzubohren, die Loecher im Boden mit 3mm.
+Fuer die Befestigung der Platine sind [M3-Einpressmuttern](https://www.amazon.de/dp/B08BCRZZS3) vorgesehen. Die Befestigung der Platine im Gehaeuse erfolgt mit M3x10 Distanzbolzen. Die Rueckwand wird dann mit M3x10 Zylinderkopfschrauben an diesen befestigt.
 
 
 ## Disclaimer
