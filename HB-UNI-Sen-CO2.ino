@@ -132,7 +132,7 @@ class SensorList0 : public RegList0<Reg0> {
 
 
 
-DEFREGISTER(Reg1, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06)
+DEFREGISTER(Reg1, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07)
 class SensorList1 : public RegList1<Reg1> {
   public:
     SensorList1 (uint16_t addr) : RegList1<Reg1>(addr) {}
@@ -161,11 +161,20 @@ class SensorList1 : public RegList1<Reg1> {
       return (this->readRegister(0x05, 0) << 8) + this->readRegister(0x06, 0);
     }
 
+    bool co2NoGreen (uint16_t value) const {
+      return this->writeRegister(0x07, value & 0xff);
+    }
+    
+    uint16_t co2NoGreen () const {
+      return this->readRegister(0x07, 0);
+    }    
+
     void defaults () {
       clear();
       co2CalibRef(410); //410ppm in fresh air
       co2StateAmber(1000);     
       co2StateRed(2000); 
+      co2NoGreen(0);       
     }
 };
 
@@ -304,7 +313,7 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
     {
       if (trafficLightEnabled)
       {
-        if (co2 <= this->getList1().co2StateAmber()) trafficLight.setGreen();
+        if ((co2 <= this->getList1().co2StateAmber()) and !(this->getList1().co2NoGreen())) trafficLight.setGreen();
         if ((co2 > this->getList1().co2StateAmber()) and (co2 <= this->getList1().co2StateRed())) trafficLight.setAmber();
         if (co2 > this->getList1().co2StateRed()) trafficLight.setRed();
       }
@@ -314,10 +323,11 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
       }
     }
 
-    void toggleTrafficLight()
+    bool toggleTrafficLight()
     {
       trafficLightEnabled = !trafficLightEnabled;
       setTrafficLight();
+      return(trafficLightEnabled);
     }
 };
 

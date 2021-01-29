@@ -15,8 +15,14 @@ public:
     uint8_t old = Button::state();
     Button::state(s);
     if( s == Button::released ) {
-      device.channel(0).toggleTrafficLight();
-      device.led2.set(LedStates::send);  
+      bool tlOn = device.channel(0).toggleTrafficLight();
+      if (tlOn) {
+        device.led2.set(LedStates::welcome);  
+      }
+      else
+      {
+        device.led2.set(LedStates::send);
+      }
     }    
     else if( s == Button::longpressed ) {
       bool fc = device.channel(0).forceCalibSCD30();
