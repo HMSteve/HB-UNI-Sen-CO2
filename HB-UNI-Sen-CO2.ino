@@ -313,6 +313,7 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
     {
       if (trafficLightEnabled)
       {
+        if ((co2 <= this->getList1().co2StateAmber()) and (this->getList1().co2NoGreen())) trafficLight.setOff();
         if ((co2 <= this->getList1().co2StateAmber()) and !(this->getList1().co2NoGreen())) trafficLight.setGreen();
         if ((co2 > this->getList1().co2StateAmber()) and (co2 <= this->getList1().co2StateRed())) trafficLight.setAmber();
         if (co2 > this->getList1().co2StateRed()) trafficLight.setRed();
