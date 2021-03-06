@@ -11,7 +11,6 @@
 #define EI_NOTEXTERNAL
 #define useBME280 //use pressure sensor for compensation
 
-#define SCD30_MEASUREMENT_INTERVAL 16  // seconds
 #define BAT_VOLT_LOW        22  // 2.2V for 2x Eneloop 
 #define BAT_VOLT_CRITICAL   20  // 2.0V for 2x Eneloop
 
@@ -128,6 +127,13 @@ class SensorList0 : public RegList0<Reg0> {
       altitude(62); //meters
       tempOffset10(0); //temperature offset for SCD30 calib: 15 means 1.5K
     }
+
+
+    void configChanged() {
+      uint16_t scd30SamplingInterval = updIntervall() / 5;
+      if (scd30SamplingInterval > 20) {scd30SamplingInterval = 20;}
+//!!!! TODO: change SCD30 sampling interval    
+    }
 };
 
 
@@ -210,6 +216,7 @@ class WeatherEventMsg : public Message {
 
 class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_PER_CHANNEL, SensorList0>, public Alarm {
     WeatherEventMsg     msg;
+    bool                firstMsg = true;
     uint16_t            millis;
     uint16_t            pressureAmb = 1013; //mean pressure at sea level in hPa
     uint16_t            pressureNN = 0; //dummy value to be returned if no sensor measurement
@@ -231,46 +238,53 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
     virtual ~WeatherChannel () {}
 
     virtual void trigger (__attribute__ ((unused)) AlarmClock& clock) {
-      uint8_t msgcnt = device().nextcount();
       // reactivate for next measure
       tick = delay();
       clock.add(*this);
+
+      // measure
       #if defined useBME280
         bme280.measure(this->device().getList0().altitude());
         pressureAmb = bme280.pressure()/10;
         pressureNN = bme280.pressureNN();
       #endif
       scd30.measure(pressureAmb);
-      co2 = scd30.carbondioxide();
-      temp10 = scd30.temperature() - this->device().getList0().tempOffset10();
-      humidity = scd30.humidity();
       
-      DPRINT("Temp x10 / Hum / PressureNN x10 / PressureAmb / Batt x10 / CO2 = ");
-      DDEC(scd30.temperature());DPRINT(" / ");
-      DDEC(scd30.humidity());DPRINT(" / ");
-      DDEC(pressureNN);DPRINT(" / ");
-      DDEC(pressureAmb);DPRINT(" / ");     
-      DDEC(device().battery().current() / 10);DPRINT(" / ");
-      DDECLN(scd30.carbondioxide());
+      // suppress potentially erranous first CO2 measurements after reset due to connecting charger
+      if (!firstMsg) {
+        co2 = scd30.carbondioxide();
+        temp10 = scd30.temperature() - this->device().getList0().tempOffset10();
+        humidity = scd30.humidity();        
       
-      msg.init( msgcnt, scd30.temperature(), scd30.humidity(), pressureNN, scd30.carbondioxide(), device().battery().current() / 10, device().battery().low());
-      if (msg.flags() & Message::BCAST) 
-      {
-        device().broadcastEvent(msg, *this);
-      }
-      else
-      {
-        device().sendPeerEvent(msg, *this);
-      }
-      
-      DisplayData.co2 = co2;
-      DisplayData.temperature = temp10 / 10.0;
-      DisplayData.humidity = humidity;   
-      DisplayData.lowbatt = device().battery().low();    
-      ePaper.mustUpdateDisplay(true);
-      ePaper.setRefreshAlarm(500);      
-     
-      setTrafficLight();
+        DPRINT("Temp x10 / Hum / PressureNN x10 / PressureAmb / Batt x10 / CO2 = ");
+        DDEC(temp10 / 10);DPRINT(" / ");
+        DDEC(humidity);DPRINT(" / ");
+        DDEC(pressureNN);DPRINT(" / ");
+        DDEC(pressureAmb);DPRINT(" / ");     
+        DDEC(device().battery().current() / 10);DPRINT(" / ");
+        DDECLN(co2);
+
+        uint8_t msgcnt = device().nextcount();
+        msg.init( msgcnt, temp10, humidity, pressureNN, co2, device().battery().current() / 10, device().battery().low());
+        if (msg.flags() & Message::BCAST) 
+        {
+          device().broadcastEvent(msg, *this);
+        }
+        else
+        {
+          device().sendPeerEvent(msg, *this);
+        }
+        
+        DisplayData.co2 = co2;
+        DisplayData.temperature = temp10 / 10.0;
+        DisplayData.humidity = humidity;   
+        DisplayData.lowbatt = device().battery().low();    
+        ePaper.mustUpdateDisplay(true);
+        ePaper.setRefreshAlarm(500);      
+       
+        setTrafficLight();
+      };
+      firstMsg = false;
     }
 
 
@@ -280,11 +294,18 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
     
     void setup(Device<Hal, SensorList0>* dev, uint8_t number, uint16_t addr) {
       Channel::setup(dev, number, addr);
-      scd30.init(device().getList0().altitude(), this->device().getList0().tempOffset10(), SCD30_MEASUREMENT_INTERVAL, false);
+      
+      uint16_t scd30SamplingInterval = this->device().getList0().updIntervall() / 5;
+      if (scd30SamplingInterval > 20) {scd30SamplingInterval = 20;}
+      DPRINT("SCD30 sampling interval : ");DDECLN(scd30SamplingInterval);
+      scd30.init(device().getList0().altitude(), this->device().getList0().tempOffset10(), scd30SamplingInterval, false);
+      
       #if defined useBME280
         bme280.init();
       #endif
+      
       trafficLight.init();
+      
       sysclock.add(*this);
     }
 
