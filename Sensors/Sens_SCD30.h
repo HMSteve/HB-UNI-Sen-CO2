@@ -87,6 +87,12 @@ public:
     }
 
 
+    bool setSamplingInterval(uint16_t sampling_interval)
+    {
+      return(_scd30.setMeasurementInterval(sampling_interval));
+    }
+
+
     float getTemperatureOffset(void)
     {
       return _scd30.getTemperatureOffset();

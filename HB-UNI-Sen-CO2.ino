@@ -127,13 +127,6 @@ class SensorList0 : public RegList0<Reg0> {
       altitude(62); //meters
       tempOffset10(0); //temperature offset for SCD30 calib: 15 means 1.5K
     }
-
-
-    void configChanged() {
-      uint16_t scd30SamplingInterval = updIntervall() / 5;
-      if (scd30SamplingInterval > 20) {scd30SamplingInterval = 20;}
-//!!!! TODO: change SCD30 sampling interval    
-    }
 };
 
 
@@ -296,7 +289,8 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
       Channel::setup(dev, number, addr);
       
       uint16_t scd30SamplingInterval = this->device().getList0().updIntervall() / 5;
-      if (scd30SamplingInterval > 20) {scd30SamplingInterval = 20;}
+      if (scd30SamplingInterval < 1) {scd30SamplingInterval = 1;}       
+      if (scd30SamplingInterval > 30) {scd30SamplingInterval = 30;}
       DPRINT("SCD30 sampling interval : ");DDECLN(scd30SamplingInterval);
       scd30.init(device().getList0().altitude(), this->device().getList0().tempOffset10(), scd30SamplingInterval, false);
       
@@ -321,6 +315,15 @@ class WeatherChannel : public Channel<Hal, SensorList1, EmptyList, List4, PEERS_
     bool forceCalibSCD30()
     {
       return(scd30.setForcedRecalibrationFactor(this->getList1().co2CalibRef()));
+    }
+
+
+    bool setSCD30SamplingInterval()
+    {
+      uint16_t scd30SamplingInterval = this->device().getList0().updIntervall() / 5;
+      if (scd30SamplingInterval < 1) {scd30SamplingInterval = 1;}      
+      if (scd30SamplingInterval > 30) {scd30SamplingInterval = 30;}
+      return(scd30.setSamplingInterval(scd30SamplingInterval));
     }
 
 
@@ -370,12 +373,14 @@ class SensChannelDevice : public MultiChannelDevice<Hal, WeatherChannel, 1, Sens
 
     virtual void configChanged () {
       TSDevice::configChanged();
+      this->channel(0).setSCD30SamplingInterval();
       DPRINTLN("* Config Changed       : List0");
       DPRINT(F("* LED Mode             : ")); DDECLN(this->getList0().ledMode());    
       DPRINT(F("* Sendeversuche        : ")); DDECLN(this->getList0().transmitDevTryMax());                   
       DPRINT(F("* SENDEINTERVALL       : ")); DDECLN(this->getList0().updIntervall());
       DPRINT(F("* Hoehe ueber NN       : ")); DDECLN(this->getList0().altitude());
-      DPRINT(F("* Temp Offset x10      : ")); DDECLN(this->getList0().tempOffset10());      
+      DPRINT(F("* Temp Offset x10      : ")); DDECLN(this->getList0().tempOffset10());   
+         
     }
 };
 
