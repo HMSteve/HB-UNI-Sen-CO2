@@ -203,6 +203,7 @@ public:
     DPRINTLN("ePaper refresh triggered");
     if (this->mustUpdateDisplay()) {
       this->mustUpdateDisplay(false);
+      display.init();
       if (this->showEmptyBattDisplay() == true ) {
           display.drawPaged(EmptyBattDisplay);
           this->showEmptyBattDisplay(false);
@@ -210,6 +211,7 @@ public:
       else {
         display.drawPaged(MeasurementsDisplay);
       }
+      pinMode(EPD_RST_PIN,INPUT); //fix current into reset pin in v2 of Waveshare display
     }
   }
   

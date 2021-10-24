@@ -9,7 +9,7 @@
 //#define NDEBUG   // disable all serial debug messages  
 
 #define EI_NOTEXTERNAL
-#define useBME280 //use pressure sensor for compensation
+//#define useBME280 //use pressure sensor for compensation
 
 #define BAT_VOLT_LOW        22  // 2.2V for 2x Eneloop 
 #define BAT_VOLT_CRITICAL   20  // 2.0V for 2x Eneloop
@@ -395,13 +395,14 @@ void setup () {
   //SG: switch on MOSFET to power CC1101 and sensors
   pinMode(CC1101_PWR_SW_PIN, OUTPUT);
   digitalWrite (CC1101_PWR_SW_PIN, LOW);
+  //init ePaper display
+  //display.init(); //not done here because v2 of Waveshare display draws about continuous 3mA via Reset pin
   DINIT(57600, ASKSIN_PLUS_PLUS_IDENTIFIER);
   sdev.init(hal);
   buttonISR(cfgBtn, CONFIG_BUTTON_PIN);
   buttonISR(usrBtn, USER_BUTTON_PIN);  
   sdev.initDone();
   //DPRINT("List0 dump: "); sdev.getList0().dump();
-  display.init();
 }
 
 
@@ -412,8 +413,10 @@ void loop() {
     if (hal.battery.critical()) {
       // this call will never return
       DPRINTLN("!!!Shutting down due to critical battery voltage!!!");
-      sdev.channel(0).stopSCD30();           
+      sdev.channel(0).stopSCD30(); 
+      display.init();          
       display.drawPaged(EmptyBattDisplay);
+      pinMode(EPD_RST_PIN,INPUT); 
       //wait a bit to let paged epd refresh finish
       delay(5000);
       pinMode(CC1101_PWR_SW_PIN, INPUT);
